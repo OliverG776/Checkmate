@@ -21,6 +21,9 @@ interface MonitorRow {
 	secret: string | null;
 	interval_ms: number;
 	is_active: boolean;
+	escalation_enabled: boolean;
+	escalation_interval_ms: number;
+	last_escalation_at: Date | null;
 	status_window: boolean[] | null;
 	status_window_size: number;
 	status_window_threshold: number;
@@ -46,7 +49,8 @@ interface MonitorRow {
 
 const MONITOR_COLUMNS = `id, user_id, team_id, name, description, type, status, url, port,
 	ignore_tls_errors, use_advanced_matching, json_path, expected_value, match_method, secret,
-	interval_ms, is_active, status_window, status_window_size, status_window_threshold, uptime_percentage,
+	interval_ms, is_active, escalation_enabled, escalation_interval_ms, last_escalation_at,
+	status_window, status_window_size, status_window_threshold, uptime_percentage,
 	cpu_alert_threshold, cpu_alert_counter, memory_alert_threshold, memory_alert_counter,
 	disk_alert_threshold, disk_alert_counter, temp_alert_threshold, temp_alert_counter, selected_disks,
 	game_id, grpc_service_name, monitor_group, geo_check_enabled, geo_check_locations, geo_check_interval_ms,
@@ -59,11 +63,12 @@ export class TimescaleMonitorsRepository implements IMonitorsRepository {
 		const result = await this.pool.query<MonitorRow>(
 			`INSERT INTO monitors (user_id, team_id, name, description, type, status, url, port,
 				ignore_tls_errors, use_advanced_matching, json_path, expected_value, match_method, secret,
-				interval_ms, is_active, status_window, status_window_size, status_window_threshold,
+				interval_ms, is_active, escalation_enabled, escalation_interval_ms, last_escalation_at,
+				status_window, status_window_size, status_window_threshold,
 				cpu_alert_threshold, cpu_alert_counter, memory_alert_threshold, memory_alert_counter,
 				disk_alert_threshold, disk_alert_counter, temp_alert_threshold, temp_alert_counter, selected_disks,
 				game_id, grpc_service_name, monitor_group, geo_check_enabled, geo_check_locations, geo_check_interval_ms)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)
 			 RETURNING ${MONITOR_COLUMNS}`,
 			[
 				userId,
@@ -82,6 +87,9 @@ export class TimescaleMonitorsRepository implements IMonitorsRepository {
 				monitor.secret ?? null,
 				monitor.interval ?? 60000,
 				monitor.isActive ?? true,
+				monitor.escalationEnabled ?? false,
+				monitor.escalationInterval ?? 300000,
+				monitor.lastEscalationAt ?? null,
 				monitor.statusWindow ?? null,
 				monitor.statusWindowSize ?? 5,
 				monitor.statusWindowThreshold ?? 60,
@@ -579,6 +587,9 @@ export class TimescaleMonitorsRepository implements IMonitorsRepository {
 			["secret", "secret"],
 			["interval", "interval_ms"],
 			["isActive", "is_active"],
+			["escalationEnabled", "escalation_enabled"],
+			["escalationInterval", "escalation_interval_ms"],
+			["lastEscalationAt", "last_escalation_at"],
 			["statusWindow", "status_window"],
 			["statusWindowSize", "status_window_size"],
 			["statusWindowThreshold", "status_window_threshold"],
@@ -1019,6 +1030,9 @@ export class TimescaleMonitorsRepository implements IMonitorsRepository {
 		port: row.port ?? undefined,
 		isActive: row.is_active,
 		interval: row.interval_ms,
+		escalationEnabled: row.escalation_enabled,
+		escalationInterval: row.escalation_interval_ms,
+		lastEscalationAt: row.last_escalation_at?.toISOString(),
 		uptimePercentage: row.uptime_percentage ?? undefined,
 		notifications: [],
 		secret: row.secret ?? undefined,

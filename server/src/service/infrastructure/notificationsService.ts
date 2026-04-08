@@ -143,7 +143,32 @@ export class NotificationsService implements INotificationsService {
 		}
 
 		// Send notifications based on decision
-		return await this.sendNotifications(monitor, monitorStatusResponse, decision);
+		const sent = await this.sendNotifications(monitor, monitorStatusResponse, decision);
+		if (sent) {
+			await this.updateEscalationState(monitor, decision);
+		}
+		return sent;
+	};
+
+	private updateEscalationState = async (monitor: Monitor, decision: MonitorActionDecision): Promise<void> => {
+		const shouldStampEscalation =
+			decision.notificationReason === "escalation" ||
+			((decision.notificationReason === "status_change" || decision.notificationReason === "threshold_breach") &&
+				(monitor.status === "down" || monitor.status === "breached"));
+
+		if (shouldStampEscalation) {
+			await this.monitorsRepository.updateById(monitor.id, monitor.teamId, {
+				lastEscalationAt: new Date().toISOString(),
+			});
+			return;
+		}
+
+		const shouldResetEscalation = decision.notificationReason === "status_change" && monitor.status === "up";
+		if (shouldResetEscalation) {
+			await this.monitorsRepository.updateById(monitor.id, monitor.teamId, {
+				lastEscalationAt: null,
+			});
+		}
 	};
 
 	sendTestNotification = async (notification: Partial<Notification>) => {
