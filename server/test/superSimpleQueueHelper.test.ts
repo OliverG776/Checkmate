@@ -114,6 +114,68 @@ describe("SuperSimpleQueueHelper", () => {
 			await expect(job({} as Monitor)).rejects.toThrow("No monitor id");
 			expect(helper["logger"].warn).toHaveBeenCalled();
 		});
+
+		it("sends escalation notification when monitor remains down past interval", async () => {
+			const notificationsService = { handleNotifications: jest.fn().mockResolvedValue(true) };
+			const { helper } = createHelper({
+				networkService: { requestStatus: jest.fn().mockResolvedValue({ monitor: { id: "m1" }, status: false, code: 503, message: "Down" }) },
+				statusService: {
+					updateMonitorStatus: jest.fn().mockResolvedValue({
+						monitor: {
+							id: "m1",
+							teamId: "team",
+							status: "down",
+							escalationEnabled: true,
+							escalationInterval: 60000,
+							lastEscalationAt: new Date(Date.now() - 120000).toISOString(),
+						},
+						statusChanged: false,
+						prevStatus: "down",
+						code: 503,
+					}),
+				},
+				notificationsService,
+			});
+			jest.spyOn(helper, "isInMaintenanceWindow").mockResolvedValue(false);
+
+			const job = helper.getHeartbeatJob();
+			await job({ id: "m1", teamId: "team" } as Monitor);
+
+			expect(notificationsService.handleNotifications).toHaveBeenCalledWith(
+				expect.objectContaining({ id: "m1" }),
+				expect.objectContaining({ status: false }),
+				expect.objectContaining({ shouldSendNotification: true, notificationReason: "escalation" })
+			);
+		});
+
+		it("does not send escalation notification before interval elapses", async () => {
+			const notificationsService = { handleNotifications: jest.fn().mockResolvedValue(true) };
+			const { helper } = createHelper({
+				networkService: { requestStatus: jest.fn().mockResolvedValue({ monitor: { id: "m1" }, status: false, code: 503, message: "Down" }) },
+				statusService: {
+					updateMonitorStatus: jest.fn().mockResolvedValue({
+						monitor: {
+							id: "m1",
+							teamId: "team",
+							status: "down",
+							escalationEnabled: true,
+							escalationInterval: 600000,
+							lastEscalationAt: new Date(Date.now() - 60000).toISOString(),
+						},
+						statusChanged: false,
+						prevStatus: "down",
+						code: 503,
+					}),
+				},
+				notificationsService,
+			});
+			jest.spyOn(helper, "isInMaintenanceWindow").mockResolvedValue(false);
+
+			const job = helper.getHeartbeatJob();
+			await job({ id: "m1", teamId: "team" } as Monitor);
+
+			expect(notificationsService.handleNotifications).not.toHaveBeenCalled();
+		});
 	});
 
 	describe("isInMaintenanceWindow", () => {

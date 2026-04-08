@@ -24,6 +24,9 @@ export const createMonitors = async (pool: Pool) => {
 			-- Scheduling
 			interval_ms             INTEGER NOT NULL DEFAULT 60000,
 			is_active               BOOLEAN NOT NULL DEFAULT TRUE,
+			escalation_enabled      BOOLEAN NOT NULL DEFAULT FALSE,
+			escalation_interval_ms  INTEGER NOT NULL DEFAULT 300000,
+			last_escalation_at      TIMESTAMPTZ,
 
 			-- Uptime tracking
 			status_window           BOOLEAN[],
